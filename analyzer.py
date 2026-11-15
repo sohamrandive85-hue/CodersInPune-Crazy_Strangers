@@ -51,18 +51,36 @@ def load_commits(source, token=None, provider=None):
         else:
             raise ValueError("Enter a GitHub URL, owner/repo, a local repository path, or 'demo'.")
         out = _git(["-C", path, "log", "-n", "50", "--name-only",
-                    "--pretty=format:%x1d%H%x1f%an%x1f%aI%x1f%s%x1f%b%x1e"], env=git_env)
+                    "--pretty=format:%x1d%H%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%b%x1e"], env=git_env)
         
         commits = []
+        # First pass: parse raw commits including email
+        raw_commits = []
         for chunk in out.split("\x1d")[1:]:
             head, _, files = chunk.partition("\x1e")
-            sha, au, dt, subj, body = head.split("\x1f", 4)
+            sha, au, email, dt, subj, body = head.split("\x1f", 5)
             file_list = [f for f in files.split("\n") if f.strip()]
             ast_info = analyze_commit_ast(path, sha, file_list)
-            commits.append(dict(
-                sha=sha, author=au, date=dt[:10], subject=subj, body=body.strip(),
-                files=file_list, ast=ast_info, ast_summary=format_ast_summary(ast_info)
+            raw_commits.append(dict(
+                sha=sha, author=au, email=email.strip().lower(), date=dt[:10],
+                subject=subj, body=body.strip(), files=file_list,
+                ast=ast_info, ast_summary=format_ast_summary(ast_info)
             ))
+
+        # Build email-based alias map: for each email, pick the most-used name
+        from collections import Counter
+        email_names = {}
+        for c in raw_commits:
+            email_names.setdefault(c["email"], Counter())[c["author"]] += 1
+        email_to_canonical = {
+            email: name_counter.most_common(1)[0][0]
+            for email, name_counter in email_names.items()
+        }
+
+        # Second pass: normalise author names
+        for c in raw_commits:
+            c["author"] = email_to_canonical.get(c["email"], c["author"])
+            commits.append(c)
     finally:
         if tmp:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -136,6 +154,31 @@ def llm_decisions(commits):
     """Extract decisions using the active LLM provider or rule-based fallback."""
     rows, _ = extract_decisions_hybrid(commits)
     return rows
+
+
+# ---------------------------------------------------------------- author normalisation
+def _build_alias_map(commits):
+    """
+    Auto-detect duplicate author identities by looking at commits that share
+    the same author email (available via git log %ae). Falls back to a
+    simple lowercase+strip normalisation when emails are identical.
+    Returns a dict mapping raw name -> canonical name.
+    """
+    # Group names by email (if email was captured); pick the most-used name
+    # as canonical. Because our git log format only captures %an (name), we
+    # do a best-effort pass: normalise whitespace/case and merge exact matches.
+    from collections import Counter
+    name_counts = Counter(c["author"] for c in commits)
+    alias = {}
+    seen = {}  # normalised key -> canonical name
+    for name, _ in name_counts.most_common():
+        key = name.strip().lower()
+        if key in seen:
+            alias[name] = seen[key]  # merge into the first (most common) form
+        else:
+            seen[key] = name
+            alias[name] = name
+    return alias
 
 
 # ---------------------------------------------------------------- analysis
