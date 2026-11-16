@@ -237,15 +237,23 @@ def analyze(commits, base="", departing=""):
     # 1. Conflicts (reverts) and Tasks (TODO/FIXME)
     for c in commits:
         text = c["subject"] + "\n" + c["body"]
+        source_markers = (c.get("ast") or {}).get("unfinished_markers", [])
+        open_in_commit = OPEN.search(text)
         if c["subject"].lower().startswith("revert"):
             score, label = score_decision(0.95, is_explicit=True)
             add(type="conflict", title=c["subject"], confidence=label, confidence_score=score,
                 alternative="", why="This reverts earlier work. Check whether the original decision still stands.",
                 **base_fields(c))
-        if OPEN.search(text) and len([i for i in items if i["type"] == "task"]) < 25:
+        if (open_in_commit or source_markers) and len([i for i in items if i["type"] == "task"]) < 25:
             high = bool(departing) and departing.lower() in c["author"].lower()
             score, label = score_decision(0.85, is_explicit=True)
-            add(type="task", title=c["subject"], why="Marked as unfinished in the commit message.",
+            why_parts = []
+            if open_in_commit:
+                why_parts.append("Marked as unfinished in the commit message.")
+            if source_markers:
+                marker_text = "; ".join(source_markers[:2])
+                why_parts.append(f"New unfinished-work marker found in changed code: {marker_text}")
+            add(type="task", title=c["subject"], why=" ".join(why_parts),
                 alternative="", priority="high" if high else "normal", confidence=label,
                 confidence_score=score, **base_fields(c))
 

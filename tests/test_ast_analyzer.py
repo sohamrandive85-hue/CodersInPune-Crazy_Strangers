@@ -73,6 +73,19 @@ def test_parse_diff_lines():
     assert any("statsmodels" in i for i in parsed["removed_imports"])
 
 
+def test_parse_diff_lines_detects_new_unfinished_markers():
+    diff_text = """
+++ src/pipeline.py
++# TODO: validate empty input
++raise NotImplementedError()
+ # existing context
+"""
+    parsed = parse_diff_lines(diff_text)
+    assert len(parsed["unfinished_markers"]) == 2
+    assert "TODO: validate empty input" in parsed["unfinished_markers"][0]
+    assert "NotImplementedError" in parsed["unfinished_markers"][1]
+
+
 def test_format_ast_summary():
     ast_info = {
         "added_classes": ["Forecaster"],
@@ -80,8 +93,10 @@ def test_format_ast_summary():
         "modified_signatures": ["fit(X) -> fit(X, y)"],
         "added_imports": ["parquet"],
         "removed_imports": ["csv"],
+        "unfinished_markers": ["# TODO: validate input"],
     }
     s = format_ast_summary(ast_info)
     assert "Classes added: Forecaster" in s
     assert "Imports added: parquet" in s
     assert "Imports removed: csv" in s
+    assert "Unfinished-work markers: # TODO: validate input" in s
