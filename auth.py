@@ -185,7 +185,7 @@ def oauth_callback(p):
     except Exception:
         pass
 
-    return redirect("/")
+    return redirect("/?signed_in=1")
 
 
 @auth_bp.post("/auth/<p>/disconnect")
