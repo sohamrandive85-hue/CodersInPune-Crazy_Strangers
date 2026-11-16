@@ -319,7 +319,7 @@ async function api(path, body) {
 const who = () => $("#who").value.trim() || "Reviewer";
 
 async function run(source) {
-  $("#err").textContent = ""; $("#go").disabled = true; $("#go").textContent = "Analyzing…";
+  $("#err").textContent = ""; $("#go").disabled = true; $("#go").textContent = "Analyzing…(It may take a couple of minutes)";
   try { const r = await api("/analyze", {source, departing: $("#dep").value}); await open(r.id); }
   catch (e) { $("#err").textContent = e.message; }
   $("#go").disabled = false; $("#go").textContent = "Analyze repository";
