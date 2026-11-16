@@ -79,12 +79,17 @@ def diff_python_code(old_code: str, new_code: str) -> dict:
 
 
 def parse_diff_lines(diff_text: str) -> dict:
-    """Heuristic structural extraction from unified diff lines for Python, JavaScript, and TypeScript."""
+    """Extract structural changes and newly added unfinished-work markers.
+
+    Markers are collected from added lines only. This avoids re-creating a task
+    for a TODO that was removed or resolved by the current commit.
+    """
     added_funcs = []
     modified_signatures = []
     added_classes = []
     added_imports = []
     removed_imports = []
+    unfinished_markers = []
 
     # Matches Python def, and JS/TS function/arrow functions
     fn_def = re.compile(
@@ -106,7 +111,20 @@ def parse_diff_lines(diff_text: str) -> dict:
         r"import\s+([\w, ]+)|from\s+([\w.]+)\s+import\s+([\w, *]+))"
     )
 
+    unfinished_re = re.compile(
+        r"\b(?:TODO|FIXME|HACK|XXX|WIP|NOT[ -]?IMPLEMENTED(?:ERROR)?)\b",
+        re.I,
+    )
+
     for line in diff_text.splitlines():
+        # Ignore file headers ("+++ ...") and inspect only newly added lines.
+        if line.startswith("+") and not line.startswith("+++"):
+            added_text = line[1:].strip()
+            if unfinished_re.search(added_text):
+                marker = re.sub(r"\s+", " ", added_text)
+                if marker and marker not in unfinished_markers:
+                    unfinished_markers.append(marker[:240])
+
         mf = fn_def.match(line)
         if mf:
             name = next((g for g in mf.groups() if g), None)
@@ -134,13 +152,14 @@ def parse_diff_lines(diff_text: str) -> dict:
         "removed_classes": [],
         "added_imports": added_imports[:8],
         "removed_imports": removed_imports[:8],
+        "unfinished_markers": unfinished_markers[:10],
     }
 
 
 def analyze_commit_ast(repo_path: str, sha: str, touched_files: list[str]) -> dict:
     """Analyze AST changes for a commit across touched Python and JS/TS files."""
     code_files = [f for f in touched_files if f.endswith((".py", ".js", ".jsx", ".ts", ".tsx"))]
-    if not code_files or not repo_path or repo_path == "demo":
+    if not touched_files or not repo_path or repo_path == "demo":
         return {}
 
     summary = {
@@ -150,23 +169,24 @@ def analyze_commit_ast(repo_path: str, sha: str, touched_files: list[str]) -> di
         "added_classes": [],
         "added_imports": [],
         "removed_imports": [],
+        "unfinished_markers": [],
     }
 
     try:
         # Use git show -U0 --format="" which safely handles all commits including initial root commit
         r = subprocess.run(
-            ["git", "-C", repo_path, "show", "-U0", "--format=", sha, "--"] + code_files,
+            ["git", "-C", repo_path, "show", "-U0", "--format=", sha, "--"] + touched_files,
             capture_output=True, text=True, timeout=10
         )
         if r.returncode == 0 and r.stdout:
             parsed = parse_diff_lines(r.stdout)
-            for k in ("added_functions", "modified_signatures", "added_classes", "added_imports", "removed_imports"):
+            for k in ("added_functions", "modified_signatures", "added_classes", "added_imports", "removed_imports", "unfinished_markers"):
                 summary[k].extend(parsed.get(k, []))
     except Exception:
         pass
 
     # Clean duplicates while preserving order
-    for k in ("added_functions", "modified_signatures", "added_classes", "added_imports", "removed_imports"):
+    for k in ("added_functions", "modified_signatures", "added_classes", "added_imports", "removed_imports", "unfinished_markers"):
         summary[k] = list(dict.fromkeys(summary[k]))
 
     return summary
@@ -187,4 +207,6 @@ def format_ast_summary(ast_info: dict) -> str:
         parts.append("Imports added: " + ", ".join(ast_info["added_imports"]))
     if ast_info.get("removed_imports"):
         parts.append("Imports removed: " + ", ".join(ast_info["removed_imports"]))
+    if ast_info.get("unfinished_markers"):
+        parts.append("Unfinished-work markers: " + " | ".join(ast_info["unfinished_markers"][:3]))
     return "; ".join(parts)

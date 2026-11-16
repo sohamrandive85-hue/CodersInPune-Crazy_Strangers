@@ -89,3 +89,21 @@ def test_analyze_demo_dataset():
     # Check departing filter: departing tasks are prioritized
     high_tasks = [i for i in items if i.get("priority") == "high"]
     assert len(high_tasks) > 0
+
+
+def test_analyze_creates_task_from_source_marker():
+    commits = [{
+        "sha": "abc123456789",
+        "author": "Developer",
+        "email": "developer@example.com",
+        "date": "2026-11-16",
+        "subject": "Add input validation",
+        "body": "",
+        "files": ["src/validator.py"],
+        "ast": {"unfinished_markers": ["# TODO: handle empty input"]},
+        "ast_summary": "Unfinished-work markers: # TODO: handle empty input",
+    }]
+    data = analyze(commits)
+    tasks = [i for i in data["items"] if i["type"] == "task"]
+    assert len(tasks) == 1
+    assert "TODO" in tasks[0]["why"]
