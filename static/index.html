@@ -230,6 +230,8 @@ button.ghost:hover{background:var(--sink);border-color:var(--dark)}
 @media(max-width:640px){.fields,#auth-box{grid-template-columns:1fr}.panel{padding:20px}}
 @media(max-width:560px){.topbar .lbl{display:none}.topbar .who{padding-left:8px}.topbar .who input{width:auto;max-width:130px;text-align:right}}
 @media(max-width:440px){.topbar .brand{display:none}}
+[hidden]{display:none!important}
+.authrow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;font-size:15px;color:var(--mute)}
 .toast{position:fixed;top:84px;right:20px;z-index:50;background:var(--dark);color:var(--lime);border:1px solid var(--lime);border-radius:var(--rs);padding:12px 18px;font-weight:600;box-shadow:0 8px 24px rgba(15,22,4,.25);transform:translateX(130%);transition:transform .35s ease;max-width:calc(100vw - 40px);overflow-wrap:anywhere}
 .toast.show{transform:translateX(0)}
 </style>
@@ -280,14 +282,16 @@ button.ghost:hover{background:var(--sink);border-color:var(--dark)}
       </div>
       <button class="primary" id="go">Analyze repository</button>
       <div class="err" id="err" role="alert"></div>
-      <div class="or" id="auth-or">or Sign In to pick a repository</div>
+      <div id="auth-signin">
+        <div class="or">or Sign In to pick a repository</div>
       <div id="auth-box">
         <button onclick="location.href='/auth/github/login'"><svg class="plogo" viewBox="0 0 24 24" aria-hidden="true"...
         <button onclick="location.href='/auth/gitlab/login'"><svg class="plogo" viewBox="0 0 24 24" aria-hidden="true"...
       </div>
-      <div class="hint" id="auth-status" hidden style="display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><span id="auth-msg"></span><button class="ghost" id="signout" type="button">Sign out</button></div>
+      </div>
       <label id="repo-drop-wrap" hidden>Your repositories<select id="repo-select"><option value="">Choose a repository</option></select></label>
       <p class="hint">You can revoke access any time in your GitHub/GitLab settings.</p>
+      <div class="authrow" id="auth-status" hidden><span id="auth-msg"></span><button class="ghost" id="signout" type="button">Sign out</button></div>
     </section>
     <section class="panel">
       <h2>Recent Handovers</h2>
@@ -527,10 +531,8 @@ async function authState() {
     var result = m;
     const signedIn = m.logged_in && m.status === "active";
     AUTH_PROVIDER = signedIn ? m.provider : null;
-    $("#auth-or").style.display = signedIn ? "none" : "";
-    $("#auth-box").style.display = signedIn ? "none" : "";
-    const st = $("#auth-status");
-    st.style.display = signedIn ? "flex" : "none";
+    $("#auth-signin").hidden = signedIn;
+    $("#auth-status").hidden = !signedIn;
     if (signedIn) {
       $("#auth-msg").textContent = "Signed in with " + (m.provider === "gitlab" ? "GitLab" : "GitHub") + (m.account_login ? " as " + m.account_login : "") + ".";
       loadRepos();
