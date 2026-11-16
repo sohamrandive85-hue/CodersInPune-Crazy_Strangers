@@ -155,8 +155,3 @@ pytest -v
 ```
 
 ---
-
-## Known Limitations & Roadmap
-
-- **Multi-Language AST Parsing**: Full syntactic AST diff analysis is implemented for Python source files via Python's built-in `ast` module. JavaScript and TypeScript files currently use lightweight regex heuristics for function/class/import extraction, with full `tree-sitter` JS/TS parsing planned next.
-- **PR & Issue Discussion Ingestion**: Decision and trade-off mining currently analyzes commit messages, multi-file diffs, and structural AST context. Direct ingestion of GitHub Pull Request reviews and issue threads is planned for a future release.
