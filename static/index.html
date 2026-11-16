@@ -477,7 +477,7 @@ function render() {
     pane.innerHTML = (tab === "review" ? `<div class="bar"><select onchange="filt.type=this.value;render()">${["all", "decision", "conflict", "risk", "dependency"].map(t => `<option value="${t}" ${filt.type === t ? "selected" : ""}>${t === "all" ? "All types" : TYPES[t]}</option>`).join("")}</select>
       <select onchange="filt.conf=this.value;render()">${[["all", "All confidence"], ["confirmed", "Confirmed"], ["inferred", "Inferred"]].map(([v, l]) => `<option value="${v}" ${filt.conf === v ? "selected" : ""}>${l}</option>`).join("")}</select>
       <span class="sp"></span><span class="tag type">${list.length} shown</span></div>` : `<div class="note">Work that commit messages mark as unfinished. Approve what the next owner should pick up.</div>`) +
-      (list.map(card).join("") || '<div class="empty">Nothing here for this repository.</div>');
+      (list.map(card).join("") || '<div class="empty">No unfinished work was found in commit messages or source comments..</div>');
   } else if (tab === "handover") {
     const n = items.filter(i => i.status === "approved").length;
     pane.innerHTML = S !== "published"
